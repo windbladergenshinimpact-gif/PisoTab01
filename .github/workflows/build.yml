@@ -1,21 +1,18 @@
-name: Build Piname: Build PisoTab APK
+name: Build PisoTab APK
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download source
+      - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Extract project ZIP
-        run: |
-          unzip -o PisoTab_Free_Starter.zip -d project
 
       - name: Setup Java
         uses: actions/setup-java@v5
@@ -23,11 +20,15 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
+      - name: Setup Android
         uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
           accept-android-sdk-licenses: true
+
+      - name: Extract project
+        run: |
+          unzip -o PisoTab_Free_Starter.zip -d project
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
