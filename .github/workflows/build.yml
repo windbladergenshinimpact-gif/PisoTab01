@@ -28,7 +28,7 @@ jobs:
 
       - name: Extract project
         run: |
-          unzip -o PisoTab_Settings_Updated_v2.zip -d project
+          unzip -o PisoTab_Bluetooth_Android15.zip -d project
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
