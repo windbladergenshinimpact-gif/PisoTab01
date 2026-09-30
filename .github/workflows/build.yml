@@ -28,8 +28,7 @@ jobs:
 
       - name: Extract project
         run: |
-          unzip -o PisoTab_Free_Starter*.zip -d project
-
+          unzip -o PisoTab_Settings_Updated*.zip -d project
       - name: Fix Java and Kotlin JVM target
         working-directory: project
         run: |
