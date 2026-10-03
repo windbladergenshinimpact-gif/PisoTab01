@@ -29,17 +29,23 @@ jobs:
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
 
-      - name: Extract PisoTab
+      - name: Extract PisoTab project
         run: |
           rm -rf build_project
-          mkdir build_project
-          unzip -o PisoTab_NonDeviceOwner_AdminLauncher_FileControl_AccessibilityGuard_Stronger_COLUMN_IS_DIRECTORY_FIXED_BUILD_APK.zip -d build_project
+          mkdir -p build_project
+          unzip -o "PisoTab_NonDeviceOwner_AdminLauncher_ActualAPK_Whitelist_Launcher_FIXED_BUILD_APK.zip" -d build_project
 
-      - name: Check project
+      - name: Find project
         run: |
-          test -f build_project/project/settings.gradle.kts
-          test -d build_project/project/app
-          echo "Android project found."
+          if [ -f build_project/project/settings.gradle.kts ]; then
+            echo "PROJECT_DIR=build_project/project" >> "$GITHUB_ENV"
+          elif [ -f build_project/project/settings.gradle ]; then
+            echo "PROJECT_DIR=build_project/project" >> "$GITHUB_ENV"
+          else
+            echo "ERROR: Android project not found"
+            find build_project -maxdepth 5 -type f -print
+            exit 1
+          fi
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -48,18 +54,17 @@ jobs:
 
       - name: Build APK
         run: |
-          cd build_project/project
+          cd "$PROJECT_DIR"
           gradle clean assembleDebug --stacktrace
 
-      - name: Prepare APK
+      - name: Find APK
         run: |
-          mkdir -p release
-          cp build_project/project/app/build/outputs/apk/debug/app-debug.apk release/PisoTab-debug.apk
-          ls -lh release/PisoTab-debug.apk
+          echo "Generated APK files:"
+          find "$PROJECT_DIR/app/build/outputs" -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: PisoTab-APK
-          path: release/PisoTab-debug.apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
