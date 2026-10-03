@@ -25,11 +25,9 @@ jobs:
         with:
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
           accept-android-sdk-licenses: true
-
-      - name: Extract project
-        run: |
-          unzip -o "PisoTab_Kiosk_Android12-15_FIXED.zip" -d project
-
+- name: Extract project
+  run: |
+    unzip -o "PisoTab_Kiosk_Android12-15_FINAL.zip" -d project
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
