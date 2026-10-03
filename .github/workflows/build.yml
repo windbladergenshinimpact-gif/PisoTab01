@@ -28,7 +28,7 @@ jobs:
 
       - name: Extract project
         run: |
-          unzip -o "PisoTab_JTechStyle_v1.7_ControlledKiosk.zip" -d project
+          unzip -o "PisoTab_JTechStyle_v1.7_ControlledKiosk.zip" -d extracted
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -36,12 +36,12 @@ jobs:
           gradle-version: '8.9'
 
       - name: Build APK
-        working-directory: project
+        working-directory: extracted/project
         run: gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: PisoTab-APK
-          path: ./project/app/build/outputs/apk/debug/*.apk
+          path: ./extracted/project/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
