@@ -28,7 +28,7 @@ jobs:
 
       - name: Extract project
         run: |
-          unzip -o "PisoTab_Kiosk_Android12-15_FINAL.zip" -d project
+          unzip -o "PisoTab_JTechStyle_v1.7_ControlledKiosk.zip" -d project
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
