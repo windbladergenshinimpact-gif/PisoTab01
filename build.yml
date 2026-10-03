@@ -1,0 +1,103 @@
+name: Build PisoTab APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          set -e
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Extract PisoTab source
+        shell: bash
+        run: |
+          set -e
+
+          ZIP="PisoTab_NonDeviceOwner_AdminLauncher_HomeLauncher_TopCorner_Timer_v4_FIXED_SOURCE.zip"
+
+          if [ ! -f "$ZIP" ]; then
+            echo "ERROR: $ZIP was not found in the repository root."
+            echo "ZIP files currently present:"
+            ls -1 *.zip 2>/dev/null || true
+            exit 1
+          fi
+
+          rm -rf build_project
+          mkdir -p build_project
+
+          unzip -q "$ZIP" -d build_project
+
+          SETTINGS=$(find build_project -type f -name "settings.gradle.kts" -print -quit)
+
+          if [ -z "$SETTINGS" ]; then
+            SETTINGS=$(find build_project -type f -name "settings.gradle" -print -quit)
+          fi
+
+          if [ -z "$SETTINGS" ]; then
+            echo "ERROR: settings.gradle(.kts) was not found."
+            find build_project -maxdepth 5 -type f | sort
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS")
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Using project: $PROJECT_DIR"
+
+      - name: Build Debug APK
+        shell: bash
+        run: |
+          set -e
+          cd "$PROJECT_DIR"
+          gradle clean assembleDebug --stacktrace
+
+      - name: Collect APK
+        shell: bash
+        run: |
+          set -e
+
+          APK=$(find "$PROJECT_DIR/app/build/outputs" -type f -name "*.apk" -print -quit)
+
+          if [ -z "$APK" ]; then
+            echo "ERROR: APK was not generated."
+            exit 1
+          fi
+
+          mkdir -p release
+          cp "$APK" release/PisoTab-v4-FIXED-debug.apk
+
+          echo "Generated APK:"
+          ls -lh release/PisoTab-v4-FIXED-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PisoTab-v4-FIXED-APK
+          path: release/PisoTab-v4-FIXED-debug.apk
+          if-no-files-found: error
