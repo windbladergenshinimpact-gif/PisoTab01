@@ -26,24 +26,30 @@ jobs:
       - name: Install Android SDK
         run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Locate Android Project
+      - name: Extract PisoTab Project
         run: |
-          PROJECT_DIR=""
-          for DIR in $(find . -type d); do
-            if [ -f "$DIR/settings.gradle" ] || [ -f "$DIR/settings.gradle.kts" ]; then
-              PROJECT_DIR="$DIR"
-              break
-            fi
-          done
+          rm -rf build_project
+          mkdir -p build_project
+          unzip -o "PisoTab_NonDeviceOwner_AdminLauncher_FileControl_AccessibilityGuard_Stronger_FIXED_BUILD_APK.zip" -d build_project
 
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Android project not found."
-            find . -maxdepth 6 -type f -print
+      - name: Verify Android Project
+        run: |
+          echo "Checking project..."
+
+          if [ ! -f "build_project/project/settings.gradle.kts" ]; then
+            echo "ERROR: settings.gradle.kts not found."
+            find build_project -maxdepth 5 -type f -print
             exit 1
           fi
 
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Android project: $PROJECT_DIR"
+          if [ ! -d "build_project/project/app" ]; then
+            echo "ERROR: app directory not found."
+            exit 1
+          fi
+
+          echo "Android project found:"
+          ls -la build_project/project
+          ls -la build_project/project/app
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -52,24 +58,31 @@ jobs:
 
       - name: Build APK
         run: |
-          cd "$PROJECT_DIR"
+          cd build_project/project
           gradle clean assembleDebug --stacktrace
 
       - name: Find APK
         run: |
-          find "$PROJECT_DIR/app/build/outputs" -type f -name "*.apk" -print
+          echo "Searching for APK..."
+          find build_project/project/app/build/outputs -type f -name "*.apk" -print
 
       - name: Prepare APK
         run: |
           mkdir -p release
-          APK=$(find "$PROJECT_DIR/app/build/outputs" -type f -name "*.apk" | head -n 1)
+
+          APK=$(find build_project/project/app/build/outputs -type f -name "*.apk" | head -n 1)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: APK not found."
+            echo "ERROR: APK was not generated."
             exit 1
           fi
 
+          echo "APK found:"
+          echo "$APK"
+
           cp "$APK" release/PisoTab-debug.apk
+
+          echo "Final APK:"
           ls -lh release/PisoTab-debug.apk
 
       - name: Upload APK
