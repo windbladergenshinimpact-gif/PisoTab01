@@ -14,13 +14,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Android
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
       - name: Install Android SDK
@@ -29,23 +29,17 @@ jobs:
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
 
-      - name: Extract PisoTab project
+      - name: Extract PisoTab
         run: |
           rm -rf build_project
           mkdir -p build_project
-          unzip -o "PisoTab_NonDeviceOwner_AdminLauncher_ActualAPK_Whitelist_Launcher_FIXED_BUILD_APK.zip" -d build_project
+          unzip -o "PisoTab_NonDeviceOwner_AdminLauncher_ActualAPK_Whitelist_Launcher_PACKAGE_VISIBILITY_FIXED_BUILD_APK.zip" -d build_project
 
-      - name: Find project
+      - name: Check Android project
         run: |
-          if [ -f build_project/project/settings.gradle.kts ]; then
-            echo "PROJECT_DIR=build_project/project" >> "$GITHUB_ENV"
-          elif [ -f build_project/project/settings.gradle ]; then
-            echo "PROJECT_DIR=build_project/project" >> "$GITHUB_ENV"
-          else
-            echo "ERROR: Android project not found"
-            find build_project -maxdepth 5 -type f -print
-            exit 1
-          fi
+          test -f build_project/project/settings.gradle.kts
+          test -d build_project/project/app
+          echo "Android project found."
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -54,17 +48,17 @@ jobs:
 
       - name: Build APK
         run: |
-          cd "$PROJECT_DIR"
+          cd build_project/project
           gradle clean assembleDebug --stacktrace
 
-      - name: Find APK
+      - name: Check generated APK
         run: |
-          echo "Generated APK files:"
-          find "$PROJECT_DIR/app/build/outputs" -type f -name "*.apk" -print
+          test -f build_project/project/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh build_project/project/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: PisoTab-APK
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          path: build_project/project/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
