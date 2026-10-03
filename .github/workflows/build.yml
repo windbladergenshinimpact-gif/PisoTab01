@@ -20,7 +20,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Android SDK
+      - name: Setup Android
         uses: android-actions/setup-android@v4
 
       - name: Install Android SDK
@@ -29,35 +29,45 @@ jobs:
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
 
-      - name: Prepare Project
+      - name: Extract PisoTab Project
         run: |
-          echo "Repository contents:"
-          find . -maxdepth 3 -type f -print
+          rm -rf build_project
+          mkdir -p build_project
 
-          if [ -f "project/settings.gradle.kts" ]; then
-            echo "Found project directory."
-          elif [ -f "settings.gradle.kts" ]; then
-            echo "Found project in repository root."
-            mkdir -p project
-            cp -r app project/
-            cp settings.gradle.kts project/
-            cp build.gradle.kts project/
-          else
-            echo "ERROR: Android Gradle project was not found."
+          unzip -o \
+            PisoTab_DeepFreezeStyle_AllowedApps_DeviceOwner_ResetProtection_AppSwitching_BUILD_APK.zip \
+            -d build_project
+
+          echo "Extracted files:"
+          find build_project -maxdepth 5 -type f -print
+
+      - name: Locate Android Project
+        run: |
+          PROJECT_DIR=$(find build_project -type f \
+            \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
+            -print \
+            | head -n 1 \
+            | xargs -r dirname)
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Android Gradle project not found inside ZIP."
+            echo ""
+            echo "Directories:"
+            find build_project -maxdepth 5 -type d -print
             exit 1
           fi
 
-      - name: Verify Project
+          echo "Android project found:"
+          echo "$PROJECT_DIR"
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Verify Android Project
         run: |
-          echo "Project:"
-          ls -la project
+          echo "Project directory:"
+          ls -la "$PROJECT_DIR"
 
-          echo "App:"
-          ls -la project/app
-
-          test -f project/settings.gradle.kts
-          test -f project/build.gradle.kts
-          test -f project/app/build.gradle.kts
+          test -d "$PROJECT_DIR/app"
 
           echo "Android project verified."
 
@@ -66,42 +76,44 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
-      - name: Build APK
-        working-directory: project
+      - name: Build PisoTab APK
         run: |
-          echo "Gradle version:"
-          gradle --version
+          cd "$PROJECT_DIR"
 
-          echo "Starting PisoTab build..."
-
+          echo "Building PisoTab..."
           gradle clean assembleDebug --stacktrace
 
-      - name: Show APK Output
+      - name: Find APK
         run: |
-          echo "APK files generated:"
+          echo "Searching for generated APK..."
 
-          find project/app/build/outputs -type f -name "*.apk" -print
+          APK=$(find "$GITHUB_WORKSPACE" \
+            -type f \
+            -name "*.apk" \
+            -print \
+            | head -n 1)
 
-      - name: Collect APK
-        run: |
-          mkdir -p release
-
-          APK="project/app/build/outputs/apk/debug/app-debug.apk"
-
-          if [ ! -f "$APK" ]; then
-            echo "ERROR: APK not found at:"
-            echo "$APK"
+          if [ -z "$APK" ]; then
+            echo "ERROR: No APK was generated."
 
             echo ""
-            echo "All build output:"
-            find project/app/build -maxdepth 10 -type f -print || true
+            echo "Build output:"
+            find "$PROJECT_DIR/app/build" \
+              -maxdepth 10 \
+              -type f \
+              -print 2>/dev/null || true
 
             exit 1
           fi
 
+          echo "APK FOUND:"
+          echo "$APK"
+
+          mkdir -p release
           cp "$APK" release/PisoTab-debug.apk
 
-          echo "APK ready:"
+          echo ""
+          echo "Final APK:"
           ls -lh release/PisoTab-debug.apk
 
       - name: Upload APK
