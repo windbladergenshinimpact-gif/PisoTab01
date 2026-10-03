@@ -30,70 +30,7 @@ jobs:
         run: |
           set -e
 
-          echo "Checking repository..."
+          echo "Checking source project..."
 
-          if [ -f "settings.gradle.kts" ]; then
-            echo "Gradle project already exists in repository root."
-          elif [ -f "PisoTab_NonDeviceOwner_AdminLauncher_Whitelist_FIXED_v2_SOURCE.zip" ]; then
-            echo "Source ZIP found."
-            rm -rf build_project
-            mkdir -p build_project/project
-            unzip -q "PisoTab_NonDeviceOwner_AdminLauncher_Whitelist_FIXED_v2_SOURCE.zip" -d build_project/project
-
-            cd build_project/project
-
-            if [ -d ".github" ]; then
-              rm -rf .github
-            fi
-          else
-            echo "ERROR: Source project or source ZIP was not found."
-            echo "Expected:"
-            echo "  settings.gradle.kts"
-            echo "or:"
-            echo "  PisoTab_NonDeviceOwner_AdminLauncher_Whitelist_FIXED_v2_SOURCE.zip"
-            exit 1
-          fi
-
-      - name: Build Debug APK
-        shell: bash
-        run: |
-          set -e
-
-          if [ -f "settings.gradle.kts" ]; then
-            PROJECT_DIR="."
-          else
-            PROJECT_DIR="build_project/project"
-          fi
-
-          echo "Building project from: $PROJECT_DIR"
-
-          cd "$PROJECT_DIR"
-
-          gradle clean assembleDebug --stacktrace
-
-      - name: Locate APK
-        shell: bash
-        run: |
-          set -e
-
-          echo "Searching for generated APK..."
-
-          APK=$(find . -type f -path "*/build/outputs/apk/debug/*.apk" -print -quit)
-
-          if [ -z "$APK" ]; then
-            echo "ERROR: No APK was generated."
-            exit 1
-          fi
-
-          echo "APK found:"
-          echo "$APK"
-
-          mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$APK" "$GITHUB_WORKSPACE/output/PisoTab-debug.apk"
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: PisoTab-debug
-          path: output/PisoTab-debug.apk
-          if-no-files-found: error
+          if [ -f "settings.gradle.kts" ] || [ -f "settings.gradle" ]; then
+            echo "Gradle project found in
