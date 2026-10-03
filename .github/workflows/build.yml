@@ -20,7 +20,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Android SDK
+      - name: Setup Android
         uses: android-actions/setup-android@v4
 
       - name: Install Android SDK
@@ -29,110 +29,11 @@ jobs:
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
 
-      - name: Find PisoTab ZIP
+      - name: Check ZIP
         run: |
           ZIP="PisoTab_NonDeviceOwner_AdminLock_Max2Apps_Volume50_BUILD_APK.zip"
 
           if [ ! -f "$ZIP" ]; then
-            echo "ERROR: ZIP not found:"
-            echo "$ZIP"
-            echo ""
-            echo "ZIP files in repository:"
-            find . -maxdepth 1 -type f -name "*.zip" -print
-            exit 1
-          fi
-
-          echo "Found:"
-          echo "$ZIP"
-
-      - name: Extract PisoTab
-        run: |
-          rm -rf build_project
-          mkdir -p build_project
-
-          unzip -o \
-            "PisoTab_NonDeviceOwner_AdminLock_Max2Apps_Volume50_BUILD_APK.zip" \
-            -d build_project
-
-          echo "Extracted files:"
-          find build_project -maxdepth 6 -type f -print
-
-      - name: Locate Android Project
-        run: |
-          PROJECT_DIR=$(find build_project -type f \
-            -name "settings.gradle.kts" -o -name "settings.gradle" \
-            -print \
-            | head -n 1 \
-            | xargs -r dirname)
-
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Android Gradle project not found."
-
-            echo "Directories:"
-            find build_project -maxdepth 6 -type d -print
-
-            exit 1
-          fi
-
-          echo "Android project found:"
-          echo "$PROJECT_DIR"
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-      - name: Verify Project
-        run: |
-          if [ ! -d "$PROJECT_DIR/app" ]; then
-            echo "ERROR: app directory not found."
-            exit 1
-          fi
-
-          echo "Project verified:"
-          ls -la "$PROJECT_DIR"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.11.1"
-
-      - name: Build PisoTab APK
-        run: |
-          cd "$PROJECT_DIR"
-
-          echo "========================================"
-          echo "BUILDING PISOTAB"
-          echo "========================================"
-
-          set +e
-
-          gradle clean assembleDebug \
-            --stacktrace \
-            2>&1 | tee build.log
-
-          STATUS=${PIPESTATUS[0]}
-
-          echo ""
-          echo "========================================"
-          echo "COMPILATION ERRORS"
-          echo "========================================"
-
-          grep -n -E \
-            "e: |error: |Unresolved reference|Expecting|Type mismatch|Cannot access|Null cannot be a value" \
-            build.log || true
-
-          echo ""
-          echo "BUILD STATUS: $STATUS"
-
-          exit "$STATUS"
-
-      - name: Find APK
-        if: ${{ success() }}
-        run: |
-          echo "Searching for APK..."
-
-          find "$PROJECT_DIR/app/build/outputs" \
-            -type f \
-            -name "*.apk" \
-            -print
-
-      - name: Collect APK
-        if: ${{ success
+            echo "ERROR: ZIP not found."
+            echo "Expected:"
+           
