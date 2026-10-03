@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Java 17
@@ -29,18 +29,18 @@ jobs:
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
 
-      - name: Find PisoTab project ZIP
+      - name: Find PisoTab ZIP
         run: |
-          ZIP="PisoTab_JTechStyle_v1.7_ControlledKiosk_HomeLauncher_BUILD_APK.zip"
+          ZIP="PisoTab_JTechStyle_v1.7_ControlledKiosk_HomeLauncher_Whitelist_RecommendedApps_BUILD_APK.zip"
 
           if [ ! -f "$ZIP" ]; then
-            echo "ERROR: $ZIP not found."
-            echo "Available files:"
-            ls -la
+            echo "ERROR: PisoTab ZIP not found."
+            echo "Available ZIP files:"
+            find . -maxdepth 2 -type f -name "*.zip" -print
             exit 1
           fi
 
-          echo "Found: $ZIP"
+          echo "Using: $ZIP"
 
       - name: Extract PisoTab project
         run: |
@@ -48,68 +48,33 @@ jobs:
           mkdir -p build_project
 
           unzip -o \
-            "PisoTab_JTechStyle_v1.7_ControlledKiosk_HomeLauncher_BUILD_APK.zip" \
+            "PisoTab_JTechStyle_v1.7_ControlledKiosk_HomeLauncher_Whitelist_RecommendedApps_BUILD_APK.zip" \
             -d build_project
 
-          echo "Extracted files:"
+          echo "Extracted project:"
           find build_project -maxdepth 4 -type f | sort
+
+      - name: Locate Android project
+        run: |
+          PROJECT_DIR=$(find build_project \
+            -type f \
+            -name "settings.gradle.kts" -o -name "settings.gradle" \
+            -print \
+            | head -n 1 \
+            | xargs -r dirname)
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Android project not found."
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Android project: $PROJECT_DIR"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
 
-      - name: Verify Android project
+      - name: Verify project
         run: |
-          PROJECT_DIR="build_project/project"
-
-          if [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
-            echo "ERROR: settings.gradle.kts not found."
-            exit 1
-          fi
-
-          if [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
-            echo "ERROR: app/build.gradle.kts not found."
-            exit 1
-          fi
-
-          echo "Android project:"
-          echo "$PROJECT_DIR"
-
-          echo "settings.gradle.kts:"
-          cat "$PROJECT_DIR/settings.gradle.kts"
-
-          echo "app/build.gradle.kts:"
-          cat "$PROJECT_DIR/app/build.gradle.kts"
-
-      - name: Build PisoTab APK
-        run: |
-          cd build_project/project
-
-          gradle clean assembleDebug --stacktrace
-
-      - name: Find APK
-        run: |
-          echo "Searching for generated APK..."
-
-          find build_project -type f -name "*.apk" -print
-
-          APK=$(find build_project -type f -name "*.apk" | head -n 1)
-
-          if [ -z "$APK" ]; then
-            echo "ERROR: APK was not generated."
-            exit 1
-          fi
-
-          echo "APK found:"
-          echo "$APK"
-
-          mkdir -p release
-          cp "$APK" release/PisoTab-debug.apk
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: PisoTab-APK
-          path: release/PisoTab-debug.apk
-          if-no-files-found: error
