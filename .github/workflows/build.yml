@@ -29,20 +29,40 @@ jobs:
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
 
+      - name: Check ZIP
+        run: |
+          echo "Checking PisoTab ZIP..."
+          ls -lh *.zip
+
+          test -f PisoTab_DeviceOwner_ClientWhitelist_RemoteLock_BUILD_APK.zip
+
+          echo "PisoTab ZIP found."
+
       - name: Extract PisoTab
         run: |
           rm -rf build_project
           mkdir build_project
 
-          unzip -o PisoTab_JTechStyle_v1.7_ControlledKiosk_HomeLauncher_Whitelist_RecommendedApps_SETTINGS_SAVE_BUTTON_FIX_BUILD_APK.zip -d build_project
+          unzip -o \
+            PisoTab_DeviceOwner_ClientWhitelist_RemoteLock_BUILD_APK.zip \
+            -d build_project
 
-          echo "Extracted PisoTab:"
-          ls -la build_project
+          echo "Extracted files:"
+          find build_project -maxdepth 4 -type f -print
 
       - name: Verify Project
         run: |
           test -d build_project/project
           test -d build_project/project/app
+
+          if [ -f build_project/project/settings.gradle.kts ]; then
+            echo "settings.gradle.kts found."
+          elif [ -f build_project/project/settings.gradle ]; then
+            echo "settings.gradle found."
+          else
+            echo "ERROR: Gradle settings file not found."
+            exit 1
+          fi
 
           echo "PisoTab Android project found."
 
@@ -55,17 +75,20 @@ jobs:
         run: |
           cd build_project/project
 
-          echo "Building PisoTab APK..."
+          echo "Building PisoTab..."
           gradle clean assembleDebug --stacktrace
 
       - name: Find APK
         run: |
-          echo "Looking for APK..."
+          echo "Searching for APK..."
 
           APK=$(find build_project -name "*.apk" -print -quit)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: APK was not generated."
+            echo "ERROR: No APK was generated."
+            echo
+            echo "Build output:"
+            find build_project/project/app/build -maxdepth 8 -type f -print 2>/dev/null || true
             exit 1
           fi
 
@@ -73,6 +96,7 @@ jobs:
           echo "$APK"
 
           mkdir -p release
+
           cp "$APK" release/PisoTab-debug.apk
 
           echo "Final APK:"
