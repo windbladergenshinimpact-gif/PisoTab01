@@ -11,16 +11,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Android SDK
+      - name: Setup Android
         uses: android-actions/setup-android@v4
 
       - name: Install Android SDK
@@ -29,11 +29,58 @@ jobs:
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
 
-      - name: Find PisoTab ZIP
+      - name: Extract PisoTab
         run: |
-          echo "ZIP files in repository:"
-          find . -maxdepth 1 -type f -iname "*.zip" -print
+          rm -rf build_project
+          mkdir build_project
 
-          ZIP=$(find . -maxdepth 1 -type f -iname "*PisoTab*.zip" \
-            ! -iname "*Bluetooth*" \
-            | sort
+          unzip -o PisoTab_JTechStyle_v1.7_ControlledKiosk_HomeLauncher_Whitelist_RecommendedApps_SETTINGS_SAVE_BUTTON_FIX_BUILD_APK.zip -d build_project
+
+          echo "Extracted PisoTab:"
+          ls -la build_project
+
+      - name: Verify Project
+        run: |
+          test -d build_project/project
+          test -d build_project/project/app
+
+          echo "PisoTab Android project found."
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Build APK
+        run: |
+          cd build_project/project
+
+          echo "Building PisoTab APK..."
+          gradle clean assembleDebug --stacktrace
+
+      - name: Find APK
+        run: |
+          echo "Looking for APK..."
+
+          APK=$(find build_project -name "*.apk" -print -quit)
+
+          if [ -z "$APK" ]; then
+            echo "ERROR: APK was not generated."
+            exit 1
+          fi
+
+          echo "APK found:"
+          echo "$APK"
+
+          mkdir -p release
+          cp "$APK" release/PisoTab-debug.apk
+
+          echo "Final APK:"
+          ls -lh release/PisoTab-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PisoTab-APK
+          path: release/PisoTab-debug.apk
+          if-no-files-found: error
