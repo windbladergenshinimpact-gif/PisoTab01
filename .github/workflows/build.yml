@@ -14,20 +14,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show repository files
-        run: |
-          echo "Repository contents:"
-          find . -maxdepth 3 -type f | sort
-
-      - name: Check ZIP
-        run: |
-          if [ ! -f "PisoTab_JTechStyle_v1.7_ControlledKiosk.zip" ]; then
-            echo "ERROR: PisoTab_JTechStyle_v1.7_ControlledKiosk.zip was not found."
-            echo "Available ZIP files:"
-            find . -type f -iname "*.zip" -print
-            exit 1
-          fi
-
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
@@ -40,15 +26,48 @@ jobs:
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
           accept-android-sdk-licenses: true
 
+      - name: Check ZIP
+        run: |
+          ZIP="PisoTab_JTechStyle_v1.7_ControlledKiosk_UPDATED.zip"
+
+          if [ ! -f "$ZIP" ]; then
+            echo "ERROR: $ZIP was not found."
+            echo "Available ZIP files:"
+            find . -type f -iname "*.zip" -print
+            exit 1
+          fi
+
+          echo "Found: $ZIP"
+
       - name: Extract project
         run: |
+          rm -rf extracted
           mkdir -p extracted
-          unzip -o "PisoTab_JTechStyle_v1.7_ControlledKiosk.zip" -d extracted
 
-      - name: Show extracted files
-        run: |
+          unzip -o "PisoTab_JTechStyle_v1.7_ControlledKiosk_UPDATED.zip" -d extracted
+
           echo "Extracted contents:"
-          find extracted -maxdepth 4 -type f | sort
+          find extracted -maxdepth 5 -type f | sort
+
+      - name: Find Android project
+        run: |
+          PROJECT_DIR=$(find extracted -type f -name "settings.gradle" -o -name "settings.gradle.kts" | head -n 1 | xargs -r dirname)
+
+          if [ -z "$PROJECT_DIR" ]; then
+            PROJECT_DIR=$(find extracted -type f -name "gradlew" | head -n 1 | xargs -r dirname)
+          fi
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Android Gradle project was not found."
+            echo "Extracted files:"
+            find extracted -maxdepth 6 -type f | sort
+            exit 1
+          fi
+
+          echo "Android project found at:"
+          echo "$PROJECT_DIR"
+
+          echo "$PROJECT_DIR" > project_dir.txt
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -56,12 +75,36 @@ jobs:
           gradle-version: '8.11.1'
 
       - name: Build APK
-        working-directory: extracted/project
-        run: gradle assembleDebug
+        run: |
+          PROJECT_DIR=$(cat project_dir.txt)
+
+          echo "Building project: $PROJECT_DIR"
+
+          cd "$PROJECT_DIR"
+
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug
+          else
+            gradle assembleDebug
+          fi
+
+      - name: Find APK
+        run: |
+          echo "Searching for APK files..."
+
+          find extracted -type f -name "*.apk" -print
+
+          APK_COUNT=$(find extracted -type f -name "*.apk" | wc -l)
+
+          if [ "$APK_COUNT" -eq 0 ]; then
+            echo "ERROR: No APK was generated."
+            exit 1
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: PisoTab-APK
-          path: extracted/project/app/build/outputs/apk/debug/*.apk
+          path: extracted/**/*.apk
           if-no-files-found: error
