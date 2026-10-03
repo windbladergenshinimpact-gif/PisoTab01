@@ -2,9 +2,6 @@ name: Build PisoTab APK
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 jobs:
   build:
@@ -25,72 +22,18 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
+      - name: Extract source
+        run: unzip -q PisoTab_NonDeviceOwner_AdminLauncher_HomeLauncher_TopCorner_Timer_v4_FIXED_SOURCE.zip -d source
+
       - name: Build APK
-        shell: bash
         run: |
-          set -e
-
-          echo "Checking PisoTab source..."
-
-          if [ -f "settings.gradle.kts" ]; then
-            echo "Source project is already extracted."
-            PROJECT_DIR="."
-          else
-            ZIP="PisoTab_NonDeviceOwner_AdminLauncher_HomeLauncher_TopCorner_Timer_v4_FIXED_SOURCE.zip"
-
-            if [ ! -f "$ZIP" ]; then
-              echo "ERROR: Source ZIP not found:"
-              echo "$ZIP"
-              echo "Available ZIP files:"
-              ls -1 *.zip 2>/dev/null || true
-              exit 1
-            fi
-
-            rm -rf build_project
-            mkdir -p build_project
-
-            unzip -q "$ZIP" -d build_project
-
-            SETTINGS=$(find build_project -type f -name "settings.gradle.kts" -print -quit)
-
-            if [ -z "$SETTINGS" ]; then
-              SETTINGS=$(find build_project -type f -name "settings.gradle" -print -quit)
-            fi
-
-            if [ -z "$SETTINGS" ]; then
-              echo "ERROR: Gradle settings file not found."
-              exit 1
-            fi
-
-            PROJECT_DIR=$(dirname "$SETTINGS")
-          fi
-
-          echo "Project directory: $PROJECT_DIR"
-
+          PROJECT=$(find source -name settings.gradle.kts -print -quit)
+          PROJECT_DIR=$(dirname "$PROJECT")
           cd "$PROJECT_DIR"
-
-          echo "Building PisoTab..."
-          gradle clean assembleDebug --stacktrace
-
-      - name: Collect APK
-        shell: bash
-        run: |
-          set -e
-
-          APK=$(find . -type f -path "*/build/outputs/apk/debug/*.apk" -print -quit)
-
-          if [ -z "$APK" ]; then
-            echo "ERROR: APK was not generated."
-            exit 1
-          fi
-
-          echo "APK found:"
-          echo "$APK"
-
-          mkdir -p "$GITHUB_WORKSPACE/release"
-
-          cp "$APK" "$GITHUB_WORKSPACE/release/PisoTab-debug.apk"
-
-          ls -lh "$GITHUB_WORKSPACE/release/PisoTab-debug.apk"
+          gradle clean assembleDebug
 
       - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PisoTab-FIXED-APK
+          path: source/**/app/build/outputs/apk/debug/*.apk
