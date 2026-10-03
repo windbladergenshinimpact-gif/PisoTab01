@@ -20,7 +20,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Android
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
       - name: Install Android SDK
@@ -29,69 +29,143 @@ jobs:
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
 
-      - name: Extract PisoTab
+      - name: Extract Fixed PisoTab Project
         run: |
           rm -rf build_project
           mkdir -p build_project
-          unzip -o PisoTab_DeepFreezeStyle_AllowedApps_DeviceOwner_ResetProtection_AppSwitching_BUILD_APK.zip -d build_project
 
-          echo "Extracted files:"
-          find build_project -maxdepth 5 -type f -print
+          ZIP="PisoTab_DeepFreezeStyle_AllowedApps_DeviceOwner_ResetProtection_AppSwitching_FIXED_BUILD_APK.zip"
 
-      - name: Locate Android Project
-        run: |
-          PROJECT_DIR=$(find build_project -type f \( -name "settings.gradle.kts" -o -name "settings.gradle" \) -print | head -n 1 | xargs -r dirname)
-
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Android project not found."
+          if [ ! -f "$ZIP" ]; then
+            echo "ERROR: ZIP not found:"
+            echo "$ZIP"
+            echo ""
+            echo "ZIP files in repository:"
+            find . -maxdepth 1 -type f -name "*.zip" -print
             exit 1
           fi
 
-          echo "PROJECT_DIR=$PROJECT_DIR"
+          echo "Found ZIP:"
+          echo "$ZIP"
+
+          unzip -o "$ZIP" -d build_project
+
+          echo ""
+          echo "Extracted project files:"
+          find build_project -maxdepth 6 -type f -print
+
+      - name: Locate Android Project
+        run: |
+          PROJECT_DIR=$(find build_project -type f \
+            \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
+            -print \
+            | head -n 1 \
+            | xargs -r dirname)
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Android Gradle project not found."
+
+            echo ""
+            echo "Directories:"
+            find build_project -maxdepth 6 -type d -print
+
+            exit 1
+          fi
+
+          echo "Android project found:"
+          echo "$PROJECT_DIR"
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Verify Android Project
+        run: |
+          echo "Checking project..."
+
+          if [ ! -d "$PROJECT_DIR/app" ]; then
+            echo "ERROR: app directory not found."
+            exit 1
+          fi
+
+          echo "Project directory:"
+          ls -la "$PROJECT_DIR"
+
+          echo ""
+          echo "App directory:"
+          ls -la "$PROJECT_DIR/app"
+
+          echo ""
+          echo "Android project verified."
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
 
-      - name: Build PisoTab
+      - name: Build PisoTab APK
         run: |
           cd "$PROJECT_DIR"
 
+          echo "========================================"
+          echo "BUILDING PISOTAB"
+          echo "========================================"
+
           set +e
-          gradle clean assembleDebug --stacktrace 2>&1 | tee build.log
+
+          gradle clean assembleDebug \
+            --stacktrace \
+            2>&1 | tee build.log
+
           STATUS=${PIPESTATUS[0]}
 
-          echo "===== COMPILATION ERRORS ====="
-          grep -n -E "e: |error: |Unresolved reference|Expecting|Type mismatch|Cannot access" build.log || true
+          echo ""
+          echo "========================================"
+          echo "COMPILATION ERRORS"
+          echo "========================================"
 
-          echo "===== BUILD STATUS ====="
-          echo "$STATUS"
+          grep -n -E \
+            "e: |error: |Unresolved reference|Expecting|Type mismatch|Cannot access|Null cannot be a value" \
+            build.log || true
+
+          echo ""
+          echo "========================================"
+          echo "BUILD STATUS: $STATUS"
+          echo "========================================"
 
           exit "$STATUS"
 
-      - name: Find APK
+      - name: Find Generated APK
         if: ${{ success() }}
         run: |
-          echo "Searching for APK..."
-          find "$PROJECT_DIR/app/build/outputs" -type f -name "*.apk" -print
+          echo "Searching for generated APK..."
+
+          find "$PROJECT_DIR/app/build/outputs" \
+            -type f \
+            -name "*.apk" \
+            -print
 
       - name: Collect APK
         if: ${{ success() }}
         run: |
           mkdir -p release
 
-          APK=$(find "$PROJECT_DIR/app/build/outputs" -type f -name "*.apk" -print | head -n 1)
+          APK=$(find "$PROJECT_DIR/app/build/outputs" \
+            -type f \
+            -name "*.apk" \
+            -print \
+            | head -n 1)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: APK not found."
+            echo "ERROR: APK was not generated."
             exit 1
           fi
 
+          echo "APK found:"
+          echo "$APK"
+
           cp "$APK" release/PisoTab-debug.apk
 
-          echo "APK:"
+          echo ""
+          echo "Final APK:"
           ls -lh release/PisoTab-debug.apk
 
       - name: Upload APK
