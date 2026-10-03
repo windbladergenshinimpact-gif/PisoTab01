@@ -1,41 +1,38 @@
-      - name: Build PisoTab APK
-        run: |
-          cd "$PROJECT_DIR"
+name: Build PisoTab APK
 
-          echo "Building PisoTab..."
-          gradle clean assembleDebug --stacktrace
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
-      - name: Find and prepare APK
-        run: |
-          echo "Searching entire workspace for APK files..."
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-          find "$GITHUB_WORKSPACE" -type f -name "*.apk" -print
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-          APK=$(find "$GITHUB_WORKSPACE" -type f -name "*.apk" | head -n 1)
-
-          if [ -z "$APK" ]; then
-            echo "ERROR: NO APK WAS GENERATED."
-            echo
-            echo "Gradle build directory:"
-            find "$PROJECT_DIR/app/build" -maxdepth 8 -type f -print 2>/dev/null || true
-            echo
-            echo "All build directories:"
-            find "$PROJECT_DIR" -maxdepth 5 -type d -name "build" -print
-            exit 1
-          fi
-
-          echo "APK FOUND:"
-          echo "$APK"
-
-          mkdir -p "$GITHUB_WORKSPACE/release"
-          cp "$APK" "$GITHUB_WORKSPACE/release/PisoTab-debug.apk"
-
-          echo "Prepared:"
-          ls -lh "$GITHUB_WORKSPACE/release/PisoTab-debug.apk"
-
-      - name: Upload PisoTab APK
-        uses: actions/upload-artifact@v4
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
         with:
-          name: PisoTab-APK
-          path: release/PisoTab-debug.apk
-          if-no-files-found: error
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-35"
+          sdkmanager "build-tools;35.0.0"
+
+      - name: Check PisoTab ZIP
+        run: |
+          ZIP="PisoTab_JTechStyle_v1.7_ControlledKiosk_HomeLauncher_Whitelist_RecommendedApps_BUILD_APK.zip"
+
+          if [ ! -f "$ZIP" ]; then
+            echo "ERROR:
