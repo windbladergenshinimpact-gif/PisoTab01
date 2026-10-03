@@ -11,105 +11,55 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Android SDK
+      - name: Setup Android
         uses: android-actions/setup-android@v4
 
-      - name: Install Android SDK packages
+      - name: Install Android SDK
         run: |
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
 
-      - name: Extract PisoTab project
+      - name: Extract PisoTab
         run: |
           rm -rf build_project
-          mkdir -p build_project
+          mkdir build_project
+          unzip -o PisoTab_NonDeviceOwner_AdminLauncher_FileControl_AccessibilityGuard_Stronger_COLUMN_IS_DIRECTORY_FIXED_BUILD_APK.zip -d build_project
 
-          ZIP="PisoTab_NonDeviceOwner_AdminLauncher_FileControl_AccessibilityGuard_Stronger_COLUMN_IS_DIRECTORY_FIXED_BUILD_APK.zip"
-
-          if [ ! -f "$ZIP" ]; then
-            echo "ERROR: ZIP not found:"
-            echo "$ZIP"
-            echo ""
-            echo "Repository files:"
-            find . -maxdepth 2 -type f -print
-            exit 1
-          fi
-
-          echo "Extracting $ZIP..."
-          unzip -o "$ZIP" -d build_project
-
-      - name: Locate Android project
+      - name: Check project
         run: |
-          echo "Searching for Gradle project..."
-
-          PROJECT_DIR=""
-
-          if [ -f "build_project/project/settings.gradle" ] || \
-             [ -f "build_project/project/settings.gradle.kts" ]; then
-            PROJECT_DIR="build_project/project"
-          else
-            FOUND=$(find build_project -type f \
-              -name "settings.gradle" -o \
-              -name "settings.gradle.kts" \
-            -print -quit)
-
-            if [ -n "$FOUND" ]; then
-              PROJECT_DIR="$(dirname "$FOUND")"
-            fi
-          fi
-
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Android Gradle project not found."
-            echo ""
-            echo "Extracted files:"
-            find build_project -maxdepth 6 -type f -print
-            exit 1
-          fi
-
-          echo "PROJECT_DIR=$PROJECT_DIR"
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-      - name: Verify Android project
-        run: |
-          echo "Project directory:"
-          echo "$PROJECT_DIR"
-
-          if [ ! -d "$PROJECT_DIR/app" ]; then
-            echo "ERROR: app directory not found."
-            find "$PROJECT_DIR" -maxdepth 4 -print
-            exit 1
-          fi
-
-          echo ""
-          echo "Project contents:"
-          ls -la "$PROJECT_DIR"
-
-          echo ""
-          echo "App contents:"
-          ls -la "$PROJECT_DIR/app"
+          test -f build_project/project/settings.gradle.kts
+          test -d build_project/project/app
+          echo "Android project found."
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
 
-      - name: Build debug APK
-        working-directory: ${{ env.PROJECT_DIR }}
+      - name: Build APK
         run: |
+          cd build_project/project
           gradle clean assembleDebug --stacktrace
 
-      - name: Find generated APK
+      - name: Prepare APK
         run: |
-          echo "Searching for generated APK..."
+          mkdir -p release
+          cp build_project/project/app/build/outputs/apk/debug/app-debug.apk release/PisoTab-debug.apk
+          ls -lh release/PisoTab-debug.apk
 
-          find "$PROJECT_DIR/app/build/outputs
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PisoTab-APK
+          path: release/PisoTab-debug.apk
+          if-no-files-found: error
