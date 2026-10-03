@@ -25,24 +25,28 @@ jobs:
 
       - name: Install Android SDK
         run: |
+          yes | sdkmanager --licenses || true
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
 
-      - name: Find PisoTab ZIP
+      - name: Check PisoTab ZIP
         run: |
           ZIP="PisoTab_JTechStyle_v1.7_ControlledKiosk_HomeLauncher_Whitelist_RecommendedApps_BUILD_APK.zip"
 
           if [ ! -f "$ZIP" ]; then
-            echo "ERROR: PisoTab ZIP not found."
+            echo "ERROR: ZIP not found:"
+            echo "$ZIP"
+            echo
             echo "Available ZIP files:"
-            find . -maxdepth 2 -type f -name "*.zip" -print
+            ls -lh *.zip 2>/dev/null || true
             exit 1
           fi
 
-          echo "Using: $ZIP"
+          echo "Found PisoTab ZIP:"
+          ls -lh "$ZIP"
 
-      - name: Extract PisoTab project
+      - name: Extract PisoTab
         run: |
           rm -rf build_project
           mkdir -p build_project
@@ -51,30 +55,9 @@ jobs:
             "PisoTab_JTechStyle_v1.7_ControlledKiosk_HomeLauncher_Whitelist_RecommendedApps_BUILD_APK.zip" \
             -d build_project
 
-          echo "Extracted project:"
-          find build_project -maxdepth 4 -type f | sort
+          echo
+          echo "Extracted contents:"
+          ls -la build_project
 
-      - name: Locate Android project
-        run: |
-          PROJECT_DIR=$(find build_project \
-            -type f \
-            -name "settings.gradle.kts" -o -name "settings.gradle" \
-            -print \
-            | head -n 1 \
-            | xargs -r dirname)
-
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Android project not found."
-            exit 1
-          fi
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Android project: $PROJECT_DIR"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11.1'
-
-      - name: Verify project
-        run: |
+          echo
+          echo "Project contents:"
