@@ -29,11 +29,84 @@ jobs:
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
 
+      - name: Prepare Project
+        run: |
+          echo "Repository contents:"
+          find . -maxdepth 3 -type f -print
+
+          if [ -f "project/settings.gradle.kts" ]; then
+            echo "Found project directory."
+          elif [ -f "settings.gradle.kts" ]; then
+            echo "Found project in repository root."
+            mkdir -p project
+            cp -r app project/
+            cp settings.gradle.kts project/
+            cp build.gradle.kts project/
+          else
+            echo "ERROR: Android Gradle project was not found."
+            exit 1
+          fi
+
+      - name: Verify Project
+        run: |
+          echo "Project:"
+          ls -la project
+
+          echo "App:"
+          ls -la project/app
+
+          test -f project/settings.gradle.kts
+          test -f project/build.gradle.kts
+          test -f project/app/build.gradle.kts
+
+          echo "Android project verified."
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
 
-      - name: Verify project
+      - name: Build APK
+        working-directory: project
         run: |
-          test -
+          echo "Gradle version:"
+          gradle --version
+
+          echo "Starting PisoTab build..."
+
+          gradle clean assembleDebug --stacktrace
+
+      - name: Show APK Output
+        run: |
+          echo "APK files generated:"
+
+          find project/app/build/outputs -type f -name "*.apk" -print
+
+      - name: Collect APK
+        run: |
+          mkdir -p release
+
+          APK="project/app/build/outputs/apk/debug/app-debug.apk"
+
+          if [ ! -f "$APK" ]; then
+            echo "ERROR: APK not found at:"
+            echo "$APK"
+
+            echo ""
+            echo "All build output:"
+            find project/app/build -maxdepth 10 -type f -print || true
+
+            exit 1
+          fi
+
+          cp "$APK" release/PisoTab-debug.apk
+
+          echo "APK ready:"
+          ls -lh release/PisoTab-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PisoTab-APK
+          path: release/PisoTab-debug.apk
+          if-no-files-found: error
