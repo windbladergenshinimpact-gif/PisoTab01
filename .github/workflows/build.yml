@@ -11,54 +11,89 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v5
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
-
-      - name: Install Android SDK
-        run: |
-          sdkmanager "platform-tools"
-          sdkmanager "platforms;android-35"
-          sdkmanager "build-tools;35.0.0"
-
-      - name: Extract PisoTab
-        run: |
-          rm -rf build_project
-          mkdir -p build_project
-          unzip -o "PisoTab_NonDeviceOwner_AdminLauncher_ActualAPK_Whitelist_Launcher_PACKAGE_VISIBILITY_FIXED_BUILD_APK.zip" -d build_project
-
-      - name: Check Android project
-        run: |
-          test -f build_project/project/settings.gradle.kts
-          test -d build_project/project/app
-          echo "Android project found."
-
-      - name: Setup Gradle
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.11.1"
+          gradle-version: '8.11.1'
 
-      - name: Build APK
+      - name: Prepare source project
+        shell: bash
         run: |
-          cd build_project/project
+          set -e
+
+          echo "Checking repository..."
+
+          if [ -f "settings.gradle.kts" ]; then
+            echo "Gradle project already exists in repository root."
+          elif [ -f "PisoTab_NonDeviceOwner_AdminLauncher_Whitelist_FIXED_v2_SOURCE.zip" ]; then
+            echo "Source ZIP found."
+            rm -rf build_project
+            mkdir -p build_project/project
+            unzip -q "PisoTab_NonDeviceOwner_AdminLauncher_Whitelist_FIXED_v2_SOURCE.zip" -d build_project/project
+
+            cd build_project/project
+
+            if [ -d ".github" ]; then
+              rm -rf .github
+            fi
+          else
+            echo "ERROR: Source project or source ZIP was not found."
+            echo "Expected:"
+            echo "  settings.gradle.kts"
+            echo "or:"
+            echo "  PisoTab_NonDeviceOwner_AdminLauncher_Whitelist_FIXED_v2_SOURCE.zip"
+            exit 1
+          fi
+
+      - name: Build Debug APK
+        shell: bash
+        run: |
+          set -e
+
+          if [ -f "settings.gradle.kts" ]; then
+            PROJECT_DIR="."
+          else
+            PROJECT_DIR="build_project/project"
+          fi
+
+          echo "Building project from: $PROJECT_DIR"
+
+          cd "$PROJECT_DIR"
+
           gradle clean assembleDebug --stacktrace
 
-      - name: Check generated APK
+      - name: Locate APK
+        shell: bash
         run: |
-          test -f build_project/project/app/build/outputs/apk/debug/app-debug.apk
-          ls -lh build_project/project/app/build/outputs/apk/debug/app-debug.apk
+          set -e
 
-      - name: Upload APK
+          echo "Searching for generated APK..."
+
+          APK=$(find . -type f -path "*/build/outputs/apk/debug/*.apk" -print -quit)
+
+          if [ -z "$APK" ]; then
+            echo "ERROR: No APK was generated."
+            exit 1
+          fi
+
+          echo "APK found:"
+          echo "$APK"
+
+          mkdir -p "$GITHUB_WORKSPACE/output"
+          cp "$APK" "$GITHUB_WORKSPACE/output/PisoTab-debug.apk"
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PisoTab-APK
-          path: build_project/project/app/build/outputs/apk/debug/app-debug.apk
+          name: PisoTab-debug
+          path: output/PisoTab-debug.apk
           if-no-files-found: error
