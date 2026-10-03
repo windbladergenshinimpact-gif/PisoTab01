@@ -30,10 +30,71 @@ jobs:
           sdkmanager "build-tools;35.0.0"
 
       - name: Check ZIP
-        run: |
-          ZIP="PisoTab_NonDeviceOwner_AdminLock_Max2Apps_Volume50_BUILD_APK.zip"
+        run: test -f "PisoTab_NonDeviceOwner_AdminLock_Max2Apps_Volume50_BUILD_APK.zip"
 
-          if [ ! -f "$ZIP" ]; then
-            echo "ERROR: ZIP not found."
-            echo "Expected:"
-           
+      - name: Extract PisoTab
+        run: unzip -o "PisoTab_NonDeviceOwner_AdminLock_Max2Apps_Volume50_BUILD_APK.zip" -d build_project
+
+      - name: Find Android Project
+        run: |
+          PROJECT_DIR=$(find build_project -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) -print | head -n 1)
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Android project not found."
+            find build_project -maxdepth 6 -type f -print
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$PROJECT_DIR")
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+          echo "Android project:"
+          echo "$PROJECT_DIR"
+
+      - name: Verify Project
+        run: |
+          echo "Project:"
+          ls -la "$PROJECT_DIR"
+
+          if [ ! -d "$PROJECT_DIR/app" ]; then
+            echo "ERROR: app directory not found."
+            exit 1
+          fi
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_DIR"
+          gradle clean assembleDebug --stacktrace
+
+      - name: Find APK
+        run: |
+          echo "APK files:"
+          find "$PROJECT_DIR/app/build/outputs" -type f -name "*.apk" -print
+
+      - name: Prepare APK
+        run: |
+          mkdir -p release
+
+          APK=$(find "$PROJECT_DIR/app/build/outputs" -type f -name "*.apk" -print | head -n 1)
+
+          if [ -z "$APK" ]; then
+            echo "ERROR: APK not found."
+            exit 1
+          fi
+
+          cp "$APK" release/PisoTab-debug.apk
+
+          ls -lh release/PisoTab-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PisoTab-APK
+          path: release/PisoTab-debug.apk
+          if-no-files-found: error
