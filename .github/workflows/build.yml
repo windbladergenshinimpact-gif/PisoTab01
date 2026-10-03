@@ -14,6 +14,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Show repository files
+        run: |
+          echo "Repository contents:"
+          find . -maxdepth 3 -type f | sort
+
+      - name: Check ZIP
+        run: |
+          if [ ! -f "PisoTab_JTechStyle_v1.7_ControlledKiosk.zip" ]; then
+            echo "ERROR: PisoTab_JTechStyle_v1.7_ControlledKiosk.zip was not found."
+            echo "Available ZIP files:"
+            find . -type f -iname "*.zip" -print
+            exit 1
+          fi
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
@@ -28,7 +42,13 @@ jobs:
 
       - name: Extract project
         run: |
+          mkdir -p extracted
           unzip -o "PisoTab_JTechStyle_v1.7_ControlledKiosk.zip" -d extracted
+
+      - name: Show extracted files
+        run: |
+          echo "Extracted contents:"
+          find extracted -maxdepth 4 -type f | sort
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -43,5 +63,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: PisoTab-APK
-          path: ./extracted/project/app/build/outputs/apk/debug/*.apk
+          path: extracted/project/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
