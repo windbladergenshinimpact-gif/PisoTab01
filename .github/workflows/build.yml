@@ -33,19 +33,50 @@ jobs:
         run: |
           test -f "PisoTab_NonDeviceOwner_AdminLauncher_FileControl_AccessibilityGuard_Stronger_BUILD_APK.zip"
 
-      - name: Extract PisoTab
+      - name: Extract ZIP
         run: |
           rm -rf build_project
           mkdir -p build_project
+          unzip -o "PisoTab_NonDeviceOwner_AdminLauncher_FileControl_AccessibilityGuard_Stronger_BUILD_APK.zip" -d build_project
 
-          unzip -o \
-            "PisoTab_NonDeviceOwner_AdminLauncher_FileControl_AccessibilityGuard_Stronger_BUILD_APK.zip" \
-            -d build_project
-
-      - name: Find Android Project
+      - name: Locate Project
         run: |
-          PROJECT_FILE=$(find build_project -type f \
-            -name "settings.gradle" -o -name "settings.gradle.kts" \
-            -print | head -n 1)
+          PROJECT_DIR=""
 
-          if [ -z "$PROJECT_FILE"
+          for DIR in $(find build_project -type d); do
+            if [ -f "$DIR/settings.gradle" ] || [ -f "$DIR/settings.gradle.kts" ]; then
+              PROJECT_DIR="$DIR"
+              break
+            fi
+          done
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Android project not found."
+            echo "Extracted files:"
+            find build_project -type f -print
+            exit 1
+          fi
+
+          echo "Found Android project:"
+          echo "$PROJECT_DIR"
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Verify Project
+        run: |
+          echo "Project directory:"
+          echo "$PROJECT_DIR"
+
+          if [ ! -d "$PROJECT_DIR/app" ]; then
+            echo "ERROR: app directory not found."
+            exit 1
+          fi
+
+          echo "Project verified."
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name:
