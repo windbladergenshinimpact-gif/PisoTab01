@@ -11,16 +11,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
       - name: Install Android SDK
@@ -29,53 +29,89 @@ jobs:
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
 
-      - name: Check ZIP
+      - name: Check PisoTab ZIP
         run: |
-          ls -lh
-          test -f PisoTab_JTechStyle_v1.7_ControlledKiosk_HomeLauncher_Whitelist_RecommendedApps_BUILD_APK.zip
+          test -f PisoTab_JTechStyle_v1.7_ControlledKiosk_HomeLauncher_Whitelist_RecommendedApps_SETTINGS_SAVE_BUTTON_FIX_BUILD_APK_READY.zip
+          echo "PisoTab ZIP found."
 
-      - name: Extract
+      - name: Extract PisoTab project
         run: |
           rm -rf build_project
-          mkdir build_project
-          unzip -o PisoTab_JTechStyle_v1.7_ControlledKiosk_HomeLauncher_Whitelist_RecommendedApps_BUILD_APK.zip -d build_project
+          mkdir -p build_project
 
-      - name: Verify Project
+          unzip -o \
+            PisoTab_JTechStyle_v1.7_ControlledKiosk_HomeLauncher_Whitelist_RecommendedApps_SETTINGS_SAVE_BUTTON_FIX_BUILD_APK_READY.zip \
+            -d build_project
+
+          echo "Extracted files:"
+          find build_project -maxdepth 4 -type f -print
+
+      - name: Locate Android project
         run: |
-          test -d build_project/project
-          test -f build_project/project/settings.gradle.kts
-          test -d build_project/project/app
-          echo "Android project found."
+          if [ -d "build_project/project" ]; then
+            echo "PROJECT_DIR=build_project/project" >> "$GITHUB_ENV"
+            echo "Android project found."
+          else
+            echo "ERROR: build_project/project not found."
+            echo "Available directories:"
+            find build_project -maxdepth 3 -type d -print
+            exit 1
+          fi
+
+      - name: Verify Android project
+        run: |
+          test -f "$PROJECT_DIR/settings.gradle.kts" || \
+          test -f "$PROJECT_DIR/settings.gradle"
+
+          test -d "$PROJECT_DIR/app"
+
+          echo "Android project verified:"
+          echo "$PROJECT_DIR"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.11.1'
+          gradle-version: "8.11.1"
 
-      - name: Build APK
+      - name: Build PisoTab Debug APK
         run: |
-          cd build_project/project
+          cd "$PROJECT_DIR"
+
+          echo "Building PisoTab..."
           gradle clean assembleDebug --stacktrace
 
       - name: Find APK
         run: |
           echo "Searching for APK..."
-          find build_project -type f -name '*.apk' -print
 
-          APK=$(find build_project -type f -name '*.apk' | head -n 1)
+          APK=$(find "$GITHUB_WORKSPACE" \
+            -type f \
+            -name "*.apk" \
+            | head -n 1)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: No APK generated."
+            echo "ERROR: No APK was generated."
+            echo
+            echo "Build output:"
+            find "$PROJECT_DIR/app/build" \
+              -maxdepth 8 \
+              -type f \
+              -print 2>/dev/null || true
             exit 1
           fi
 
+          echo "APK found:"
+          echo "$APK"
+
           mkdir -p release
+
           cp "$APK" release/PisoTab-debug.apk
 
-          echo "APK ready:"
+          echo
+          echo "Final APK:"
           ls -lh release/PisoTab-debug.apk
 
-      - name: Upload APK
+      - name: Upload PisoTab APK
         uses: actions/upload-artifact@v4
         with:
           name: PisoTab-APK
